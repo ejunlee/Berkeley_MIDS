@@ -1,0 +1,245 @@
+---
+title: "Democrates or Republicans. Who Had More Difficulty Voting?"
+subtitle: "Datasci 203 Lab 1 Part 2 - Research Report for a Think Tank from a Consulting Group"
+author: "Ivy Chan, Jonathan Hodges, Dipika Kumar, Christian Lee"
+note: "Research Report for a Think Tank from a Consulting Group"
+date: "October 18, 2022"
+output:
+  bookdown::pdf_document2: 
+    toc: true
+    number_sections: true
+    spacing: single
+---
+
+\newpage
+\setcounter{page}{1}
+
+
+
+```{r load packages and set options, include=FALSE, echo=FALSE, message=FALSE}
+library(dplyr)
+library(ggplot2) 
+library(gridExtra)
+library(tidyverse)
+library(haven)
+library(magrittr)
+library(knitr)
+library(patchwork)
+library(moments)
+
+
+theme_set(theme_bw())
+
+options(tinytex.verbose = TRUE)
+knitr::opts_chunk$set(echo=FALSE, message=FALSE)
+```
+
+```{r load data, echo = FALSE, message = FALSE, warning=FALSE}
+data <- read_csv('anes_timeseries_2020_csv_20220210.csv')
+```
+
+```{r data wrangling and cleaning, echo = FALSE}
+# Registered to vote or intend to register, specifying difficulty and party categorization
+# new column party is created. 0=Democrat, 1=Republican
+anes <- data %>%
+  mutate(registered_to_vote = ifelse(V201008 == 1 | V201008 == 2 | V201009 == 1, TRUE, FALSE)) %>%
+  mutate(intend_to_register = ifelse(V201008 == 3 & V201019 == 1, TRUE, FALSE)) %>%
+  mutate(party = case_when(V201228 == 1 ~ 'D', V201228 == 2 ~ 'R')) %>%
+  filter(registered_to_vote == TRUE | intend_to_register == TRUE) %>%
+  rename('Difficulty1'= V202119) %>%
+  mutate(difficulty_given1 = ifelse(Difficulty1 == 2 | Difficulty1 == 3 | Difficulty1 == 4 | Difficulty1 == 5, TRUE, FALSE)) %>%
+  rename('Difficulty2'= V202123) %>%
+  mutate(difficulty_given2 = ifelse(Difficulty2 == 9 | Difficulty2 == 10 | Difficulty2 == 11 | Difficulty2 == 12 | Difficulty2 == 13 | Difficulty2 == 14 | Difficulty2 == 15, TRUE, FALSE)) %>%
+  mutate(all_difficulty = ifelse(difficulty_given1 == TRUE | difficulty_given2 == TRUE, TRUE, FALSE)) %>%
+  drop_na(party)
+
+```
+
+```{r echo=FALSE, output=FALSE, results='hide'}
+"anes now is now cleaned. It contains only registered voters (registered_to_vote == TRUE or intend_to_register == TRUE).
+We are only interested in only two columns for our statistics tests - party and all_difficulty.
+party has two values = 0 = Democrats and 1 = Republicans
+all_difficulty is a boolean column: TRUE means the voters have difficulty to vote, FALSE means the voters have no difficulty"
+```
+
+```{r number of democrats and republicans, echo = FALSE, results='hide'}
+num_dem_rep = summary(factor(anes$party))
+num_dem_rep
+total_democrat = num_dem_rep[1]
+total_republican = num_dem_rep[2]
+```
+
+
+```{r table to show democrats and republicans with and without all difficulties, echo=FALSE, results='hide'}
+party_all_difficulty_table = anes %>% count(party, all_difficulty, name="count")
+party_all_difficulty_table
+democrat_with_difficulty = party_all_difficulty_table[2, 3]
+republican_with_difficulty = party_all_difficulty_table[4, 3]
+```
+
+# Importance and Context
+
+Voter engagement for the 2020 United States presidential election was at record levels, with more voters saying “it really matters” who wins the presidency than at any point over the last twenty years. At the same time, challenges such as the pandemic and social unrest led to half of the registered voters indicating it would be difficult to vote in the election. There has been a significant change since October 2018, shortly before that year’s midterm election, when 85% of registered voters said it would be easy to vote in the midterm elections \footnote{Pew Research Center "https://www.pewresearch.org/politics/2020/08/13/election-2020-voters-are-highly-engaged-but-nearly-half-expect-to-have-difficulties-voting/" August 13, 2020}. A better understanding of the various influencers of voter turnout is useful for your organization for party strategists and campaign managers.
+
+This study will focus on the 2020 election and better understand the difficulty levels in voting between parties, which is one of many factors impacting voter turnout. Specifically, the goal of the analysis is to address the following research question:
+
+\begin{quote}
+  \textit{Did Democratic voters or Republican voters experience more difficulty voting in the 2020 election?}
+\end{quote}
+
+As consultants we are here to answer this question in order to provide guidance and a foundation for your future research. This includes determining if voter difficulty is a major bellwether of turnout and, if so, further decomposing the factors that lead to these difficulty levels, such as registration, absentee versus in-person voting, long waits at polling places, or bad weather, which can be analyzed in the future. In addition, this analysis will allow us to identify if the difference in difficulty voting between Republicans vs. Democrats was statistically significant in the recent election. If the results are statistically significant, the reasons for difficulty in voting can be further assessed and mitigated.
+
+
+# Data and Methodology
+
+The study utilized data from the 2020 Times Series Study conducted by the American National Election Studies (ANES). The Times Series Study interviewed 8280 individuals and comprised pre-election and post-election interviews from August 2020 through the end of December 2020. The sample we created from a subset of the ANES Times Series Study is limited in terms of generalizing to the US voter population across all demographic groups. This is due to the fact that we didn't leverage the weighting provided by ANES that is based on the US census.
+
+Before answering the question of which political party had more difficulty voting, we need to operationalize the concepts, including who is a voter, their political affiliation, and the type of difficulty the individual had. Having this information provides context to exhibit who had more difficulty voting statistically. 
+
+To classify a respondent as a voter, we look at those who have already registered to vote (at their current address, another address, or without an address) or are planning on registering to vote. As registering is a prerequisite for voting, we believe this variable is a strong indicator of being a voter. For V201008, values 1, 2, and 3 gave information about their registration address, while the other values did not give additional information. V201009 determined if voters were registered to vote, and value 1 gave applicable information for the study. 
+
+We use the following fields for voter identification:\
+![Fields for Voter Identification](img/img1.jpg){width=65%}
+
+There are multiple ways to identify a respondent's respective party, for instance, voting behavior in past elections, voting in the primaries, the party they are currently registered to, etc. The pre-election self-identified affiliation variable was the best way to measure a respondent's political stance due to the quality and quantity of the data. Their political stance before and during the act of voting was taken into consideration. Values 1 and 2 correspond to the political party, while the other values did not give any more information.
+
+We use the following field for party affiliation:\
+![Fields for Party Affiliation](img/img2.jpg){width=65%}
+
+
+How difficult it was for respondents to vote and the main reason respondents did not vote were used to determine the difficulty in voting. The combination of the two factors encompassed how hard it was for voters to cast their vote and why they found voting difficult. The values (2,3,4,5) of having difficulty voting were used in the study to determine which party had more difficulty for V202119. We utilized values that were not in the respondents control that induced difficulty in voting for V202123.
+
+We use the following field for difficulty:\
+![Fields for Difficulty](img/img3.jpg){width=65%}
+
+After assigning true or false values based on if it was difficult for party members to vote, we observed how many democrats and republicans had difficulty voting.\
+
+![Compare Democrat (D) vs. Republican (R) Difficulty Voting](img/img4.jpg){width=65%}
+
+
+Democrats had more true and false values, which aligned with the population of democrats being higher than republicans. However, we looked into the true and false cases as a percentage of the respective party population samples. The percentage difference between true and false was not notable between parties. Utilizing the party as a grouping variable and defining the response variable as proportional count of difficulties per group we can conduct some statistical tests. 
+
+We evaluated various reputable hypothesis tests to determine which is best for answering our research question. After reviewing the assumptions that must be met for each test, we were able to narrow our choices down to the two-sample proportion test and the comparison version of the Wilcoxon rank sum test. As we evaluated difficulty as a binary true or false value instead of a scale of ordered categories, the data was determined to be more appropriately wrangled for the proportion test. Additionally, the Wilcoxon rank sum test is of lesser statistical power; therefore, we determined the proportion test was best suited for our analysis from these two test options. 
+
+The proportional statistic assumptions were validated for proper use of the test statistic. The first assumption for the proportional two-group comparison test was independence and identical distributions (i.i.d). Independence can be assumed since random sampling occurred, and one sample's information cannot be inferred from other samples. However, the population of the samples changes from 8280 (pre-election interviews) to 7,782 (post-election interviews). There is a 7% decrease in the population size, which will not heavily affect the probability distribution. The following other assumptions are correct as the sample population follows a binomial distribution, and the data are simple random values from the population. 
+
+While evaluating for practical significance, Cohen’s d is not well suited as it requires normality. For our binary data, we chose the Phi coefficient, which yielded a value of -0.031. The result indicates that there is virtually no relationship between political party and voter difficulty, meaning other factors drive difficulty.
+
+```{r practical significance Phi Coefficient test, echo=FALSE, results='hide'}
+
+matrix_data <- matrix(c(total_democrat - democrat_with_difficulty$count, total_republican - republican_with_difficulty$count, 
+                        democrat_with_difficulty$count, republican_with_difficulty$count), nrow = 2)
+matrix_data
+
+library(psych)
+phi(matrix_data, digits = 3)
+
+```
+
+Below is the accounting table summarizing the data wrangling after the exploratory data analysis (EDA) of the dataset.\
+
+![Accounting Table](img/img5.jpg){width=80%}
+
+```{r test create a bar chart, echo=FALSE, output=FALSE, results='hide', fig.show='hide'}
+anes %>% count(party, all_difficulty, name="count") %>%
+ ggplot(aes(party, count, fill = all_difficulty)) + 
+    geom_bar(position = 'dodge', stat="identity") + 
+    theme(axis.text.x = element_text(angle = 0, vjust = 0.5, hjust=1)) +
+    scale_fill_manual("Difficulty Voting", values = c('FALSE' = "dark green", 'TRUE' = "dark orange")) +
+    labs(
+      x = "Political Party", 
+      y = 'Count',
+      title = "Compare Difficulty Voting for Democrat (D) vs. Republican (R)") + 
+    theme(legend.position = 'bottom', legend.box = 'horizontal', plot.title = element_text(size=10, hjust = 0.5), axis.title=element_text(size=8))
+
+```
+
+```{r create a bar chart to compare Democrat vs Republican Difficulty to Vote, echo=FALSE, output=FALSE, results='hide', fig.show='hide'}
+anes %>% count(party, all_difficulty, name="count") %>%
+ ggplot(aes(all_difficulty, count, fill = party)) + 
+    geom_bar(position = 'dodge', stat="identity") + 
+    theme(axis.text.x = element_text(angle = 0, vjust = 0.5, hjust=1)) +
+    scale_fill_manual("Political Party", values = c("D" = "dodgerblue1", "R" = "brown1")) +
+    labs(
+      x = "Difficulty Voting", 
+      y = 'Count',
+      title = "Compare Democrat (D) vs. Republican (R) Difficulty Voting") + 
+    theme(legend.position = 'bottom', legend.box = 'horizontal', plot.title = element_text(size=10, hjust = 0.5), axis.title=element_text(size=8))
+
+```
+
+```{r subset a dataframe with two columns - party and all_difficulty, echo=FALSE, output=FALSE, results='hide'}
+#https://dplyr.tidyverse.org/reference/select.html
+anes_2col = anes %>% select(party, all_difficulty)
+```
+
+```{r create a table to show party and all_difficulty in percentage, echo=FALSE, output=FALSE, results='hide'}
+#https://community.rstudio.com/t/pivot-a-two-way-frequency-table-with-proportions/27615
+anes_2col %>% 
+  count(party, all_difficulty) %>% 
+  group_by(party) %>% 
+  mutate(prop = prop.table(n))
+```
+
+```{r create a pivot table to show party and all_difficulty in both count and percentage, echo=FALSE, results='hide'}
+#https://community.rstudio.com/t/pivot-a-two-way-frequency-table-with-proportions/27615
+library(janitor)
+anes_2col %>%
+  tabyl(party, all_difficulty) %>%
+  adorn_percentages("row") %>%
+  adorn_pct_formatting(digits = 1) %>%
+  adorn_ns("front")
+
+```
+
+```{r prepare for prop.test. Proportion Hypothesis Tests for Binary Data, echo=FALSE, output=FALSE, results='hide'}
+c(democrat_with_difficulty$count, republican_with_difficulty$count)
+c(total_democrat, total_republican)
+```
+
+# Result
+As we have two independent samples, Democratic voters and Republican voters, and difficulty being defined and organized as binary/boolean values, we derived the counts for total voters and the counts for voters with difficulty for each party. We use the proportion hypothesis test for binary data \footnote{Comparing Hypothesis Testing for Continuous, Binary, and Count Data "https://statisticsbyjim.com/hypothesis-testing/comparing-hypothesis-tests-data-types/" Date: NA}. 
+
+\begin{quote}
+  \textbf{Null Hypothesis:} \textit{The proportion of Democrat voters with difficulty voting is equal to the proportion of Republican voters with difficulty voting.}
+\end{quote}
+
+\begin{quote}
+    \textit{H0: p1=p2, versus select one HA: p1!=p2} \footnote{Comparing Two Proportions 
+"https://online.stat.psu.edu/stat415/lesson/9/9.4" Date: NA}
+\end{quote}
+
+The proportion hypothesis test returns a p-value of 0.02847, which leads us to fail to reject the null hypothesis as it is not within the rejection region (< 0.025).The result is not statistically significant.
+
+
+\scriptsize
+```{r prop test, echo=FALSE, results=TRUE}
+
+prop.test(c(democrat_with_difficulty$count, republican_with_difficulty$count), c(total_democrat, total_republican), 
+        alternative = "two.sided")
+
+```
+\normalsize
+
+```{r prepare for Wilcoxon Rank Sum Test, echo = FALSE, results='hide'}
+# Registered to vote or intend to register, specifying difficulty and party categorization
+# new column party is created. 0=Democrat, 1=Republican
+anes <- anes %>%
+  mutate(party_numeric = case_when(party=='D' ~ 0, party == 'R' ~ 1)) %>%
+  mutate(all_difficulty_numeric = case_when(all_difficulty==TRUE ~ 1, all_difficulty == FALSE ~ 0))
+
+```
+
+```{r check summary of _numeric column, echo=FALSE, results='hide'}
+summary(anes$all_difficulty_numeric)
+```
+
+```{r Wilcoxon Rank Sum Test, echo=FALSE, message=FALSE, results='hide'}
+test <- wilcox.test(anes$all_difficulty_numeric ~ anes$party_numeric)
+test
+```
+
+# Discussion
+
+While this is limited based on how Democrats and Republicans responded to ANES interviews, our study found evidence that voting difficulty does not have a strong relationship with the voter's political party. It is consistent with our findings that there is no significant difference in the Democrat and Republican populations we compared for voting difficulty. Additionally, we have shown that difficulty wasn’t experienced at a very high rate across either party, with just over 10% of Democrats and Republicans expressing this in their survey responses. 
+Since the 2020 election had the highest turnout in United States history, it does not appear that difficulty had a significant role in preventing people from getting to the polls. Instead, it may make sense for future research to look at other predictors of voter turnout, such as education or socioeconomic status.
