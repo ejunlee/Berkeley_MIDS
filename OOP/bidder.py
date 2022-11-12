@@ -57,10 +57,11 @@ class Bidder:
             else:
                 self.user_dict[user] = 1
         #Update if the user is in the bidders list and has clicked to watch the add
-        if user in self.user_dict_total:
-                self.user_dict_total[user] += 1
-        #Add the user to the list of watched adds
-        else:
-            self.user_dict_total[user] = 1
-            # print("You won the auction and the cost of the bid was", price)
-            # print("User choose to click:",clicked)
+        if auction_winner == True and clicked == True:
+            if user in self.user_dict_total:
+                    self.user_dict_total[user] += 1
+            #Add the user to the list of watched adds
+            else:
+                self.user_dict_total[user] = 1
+                # print("You won the auction and the cost of the bid was", price)
+                # print("User choose to click:",clicked)
