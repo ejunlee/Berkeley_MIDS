@@ -1,7 +1,7 @@
 ---
 title: "TeamWeR - Predicting Diamond Price"
 subtitle: "Datasci 203 Lab 2"
-author: "Ivy Chan, Jonathan Hodges, Dipika Kumar, Christian Lee"
+author: "Christian Lee, Ivy Chan, Jonathan Hodges, Dipika Kumar"
 output:
   pdf_document
 header-includes:
